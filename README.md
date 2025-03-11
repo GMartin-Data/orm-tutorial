@@ -10,7 +10,7 @@ In a one-to-many relationship, one record in a table can be associated with mult
 
 A teacher can have many students, but each student has only one teacher.
 
-### Implementation With SQLAlchemy 2.0
+### 🐍 Implementation With SQLAlchemy 2.0
 
 👉 `sqlalchemy_examples/one_to_many.py`
 
@@ -88,7 +88,7 @@ pure SQLAlchemy.
 - We call `session_refresh(math_teacher)` to ensure relationships are loaded
   properly
 
-### Implementation with SQLModel
+### 🐍 Implementation with SQLModel
 
 👉 `sqlmodel_examples/one_to_many.py`
 
@@ -110,7 +110,7 @@ multiple records in the other table.
 - Students can enroll in multiple courses
 - Each course may have multiple students
 
-### Implementation
+### 🐍 Implementation
 
 👉 `sqlalchemy_examples/many_to_many.py`
 
@@ -155,7 +155,7 @@ python -m sqlalchemy_examples/many_to_many.py
 
 Now, let's implement the same many-to-many relationship using SQLModel
 
-### Implementation
+### 🐍 Implementation
 
 👉 `sqlmodel_examples/many_to_many.py`
 
@@ -243,7 +243,7 @@ important for data quality
 After importing, we query the database to verify that the relationships were
 correctly established
 
-### Implementation
+### 🐍 Implementation
 
 ▶️ You can run this script with
 
@@ -279,10 +279,110 @@ with some differences in syntax:
 SQLModel provides a cleaner API but the fundamental technique for importing data
 from DataFrames remains the same.
 
-### Implementation
+### 🐍 Implementation
 
 ▶️ You can run this script with
 
 ```bash
 python -m sqlmodel_examples.one_to_many_pandas
+```
+
+## Part 7: Populating Many-to-Many Relationships from DataFrames With SQLAlchemy 2.0
+
+### Understanding Many-to-Many Population With SQLAlchemy
+
+The key challenge with many-to-many relationships is that we need three DataFrames
+instead of 2.
+
+#### 1. A DataFrame for Each Main Entry
+
+- `students_df`: Contains student information (name, email)
+- `courses_df`: Contains course information (title, description)
+
+#### 2. A DataFrame for the Relationship Itself
+
+- `enrollments_df`: Contains records linking students to courses
+- Each row represents a student enrolled in a course
+- Includes the enrollment date to demonstrate handling addtional attributes on
+  the relationship
+
+#### 3. Natural Keys VS Database IDs
+
+The DataFrames use natural keys (emails for students, title for courses), but
+the database use numeric IDs. We manage this difference trhough:
+
+- Creating mappings after inserting records
+- Using `session.flush()` to get database-assigned IDs
+- Looking up entities by their natural keys when creating relationship records
+
+#### 4. Date Handling
+
+- The enrollment date comes from the DataFrame as a string
+- We parse it into a Python `datetime` object before storing
+
+#### 5. Error Handling
+
+- We check that both the student and course exist before creating a link
+- That prevents orphaned relationships records
+
+### 🐍 Implementation
+
+▶️ You can run this script with
+
+```bash
+python -m sqlalchemy_examples.many_to_many_pandas
+```
+
+## Populating Many-to-Many Relationships from DataFrames With SQLModel
+
+### Key Techniques For Importing DataFrames Into ORMs
+
+Through these examples, we've covered several important techniques for working
+with Pandas DataFrames and ORMs:
+
+#### 1. Handling Natural Keys VS Database IDs
+
+In DataFrames, we often reference entities by natural keys (names, emails, etc.)
+, while databases use surrogate keys (IDs). To bridge this gap:
+
+- Create in-memory mappings from natural keys to ORM objects
+- Use `session.flush()` to get database-assigned IDs before creating relationships
+- Look up objects using the mapping when creating relationships
+
+#### 2. Managing Relationships
+
+Both one-to-many and many-to-many relationships require careful handling:
+
+- **One-to-Many**: Each child record (student) references a single parent (teacher)
+- **Many-to-Many**: A separate "join" table (and DataFrame) links entities together
+
+#### 3. Data Type Conversion
+
+Converting between DataFrame and database types requires attention:
+
+- Parse date strings into Python `datetime` objects
+- Handle nullable fields appropriately
+- Ensure consistent formatting of natural keys (e.g. case sensitivity)
+
+#### 4. Transaction Management
+
+Using a single transaction for the entire import ensures data consistency
+
+- All data is committed at once, preventing partial imports
+- If an error occurs, the entire transaction can be rolled back
+
+#### 5. Validation and Error Handling
+
+Before creating relationships, we validate that both entities exist:
+
+- Check that referenced objects are present in the mappings
+- Skip or report records that reference missing entities
+- This prevents orphaned relationships or constraint violations
+
+### 🐍 Implementation
+
+▶️ You can run this script with
+
+```bash
+python -m sqlmodel_examples.many_to_many_pandas
 ```
