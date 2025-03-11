@@ -194,3 +194,59 @@ Let's examine how SQLModel handles many-to-many relationships:
 ```bash
 python -m sqlmodel_examples.many_to_many
 ```
+
+# Populating ORM Models with Pandas DataFrames
+
+## Part 5: Populating One-to-Many Relationships From DataFrames With SQLAlchemy 2.0
+
+### Understanding One-to-Many Population With SQLAlchemy
+
+Let's break down what's happening in this example for populating a one-to-many
+relationship from pandas DataFrames:
+
+#### 1. Creating Sample Data
+
+We first create two DataFrames:
+
+- `teachers_df`: Contains teacher names and their subjects
+- `students_df`: Contains students names, grades, and, more importantly, a
+  `teacher_name` column that we'll use to link students to teachers
+
+#### 2. Key Challenges
+
+The main challenge is maintaining relationships.
+
+Our DataFrames have names (like 'Ms. Johnson'), but our database needs foreign
+keys (numeric IDs)
+
+#### 3. The Solution
+
+- We create and persist teachers first
+- We build a mapping dictionary (`teacher_map`) to link teacher names to teacher
+  objects.
+- We flush the session to ensure teachers get their IDs from the database
+- When creating students, we look up the appropriate teacher using this mapping
+
+#### 4. Important Technique: Using `session.flush()`
+
+- `flush()` synchronizes the session with the database without committing
+- This ensures teachers get their auto-generated primary keys before we use them
+  as foreign keys
+
+#### 5. Error Handling
+
+We include a check for missing teachers when processing students, which is
+important for data quality
+
+#### 6. Verification
+
+After importing, we query the database to verify that the relationships were
+correctly established
+
+### Implementation
+
+▶️ You can run this script with
+
+```bash
+python -m sqlalchemy_examples.one_to_many_pandas
+```
