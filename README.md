@@ -43,7 +43,7 @@ Let''s break down what's happening in this example:
 - We query for a teacher and access their students through the relationship.
 - We also demonstrate accessing a student's teacher through the relationship.
 
-You can run this script with:
+▶️ You can run this script with:
 
 ```bash
 python -m sqlalchemy_examples.one_to_many
@@ -92,7 +92,7 @@ pure SQLAlchemy.
 
 👉 `sqlmodel_examples/one_to_many.py`
 
-You can run this script with:
+▶️ You can run this script with:
 
 ```bash
 python -m sqlmodel_examples/one_to_many
@@ -149,4 +149,48 @@ deleted when a parent record is deleted**.
 
 ```bash
 python -m sqlalchemy_examples/many_to_many.py
+```
+
+## Part 4: Many-to-Many Relationship With SQLModel
+
+Now, let's implement the same many-to-many relationship using SQLModel
+
+### Implementation
+
+👉 `sqlmodel_examples/many_to_many.py`
+
+Let's examine how SQLModel handles many-to-many relationships:
+
+#### 1. Class Definitions
+
+- We still define three classes: `Student`, `Course`, and the association class
+  `StudentCourseLink`
+- All inherit from `SQLModel`, with `table=True`
+
+#### 2. Fields and Types
+
+- We use `Field()` to define columns with attributes with `foreign_key` and
+  `primary_key`
+- For default values, we use `default_factory=datetime.now` instead of
+  `default=datetime.now`
+
+#### 3. Relationship Definition
+
+- We use `Relationship()` instead of `relationship()`
+- We still need the helper properties to directly access related objects
+
+#### 4. Session Management
+
+- We use `session.exec()` instead of `session.execute()`
+- We use `session.refresh()` to ensure relationships are properly loaded
+
+#### 5. Type Hints
+
+- SQLModel integrates better with static type checking
+- We don't need to use Python's `Mapped[]` type, as SQLModel handles this internally
+
+▶️ You can run this script with:
+
+```bash
+python -m sqlmodel_examples.many_to_many
 ```
