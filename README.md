@@ -250,3 +250,39 @@ correctly established
 ```bash
 python -m sqlalchemy_examples.one_to_many_pandas
 ```
+
+## Part 6: Populating One-to-Many Relationships from DataFrames With SQLModel
+
+### SQLModel VS SQLAlchemy for DataFrame Import
+
+The SQLModel implementation follows a similar approach to the SQLAlchemy one,
+with some differences in syntax:
+
+#### 1. Model Definition
+
+- SQLModel combines the attributesof SQLAlchemy's models with Pydantic validation
+- We use `Optional[int]` for IDs and foreign keys with `default=None`
+
+#### 2. Session Operations
+
+- We use `session.exec()` instead of `session.execute()`
+- We use `len(session.exec(...).all())` instead of `session.query(...).count()`
+
+#### 3. Relationship Management
+
+- The process for maintaining relationships is identical:
+  - insert teachers first
+  - create a mapping between names and objects
+  - link students to teachers using this mapping
+- Both frameworks handle the bidirectional relationship correctly
+
+SQLModel provides a cleaner API but the fundamental technique for importing data
+from DataFrames remains the same.
+
+### Implementation
+
+▶️ You can run this script with
+
+```bash
+python -m sqlmodel_examples.one_to_many_pandas
+```
