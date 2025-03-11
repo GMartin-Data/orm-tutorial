@@ -97,3 +97,56 @@ You can run this script with:
 ```bash
 python -m sqlmodel_examples/one_to_many
 ```
+
+## Part 3: Many-to-Many Relationships with SQLAlchemy 2.0
+
+Now, let's implement a many-to-many relationship with SQLAlchemy 2.0.
+
+In this relationship type, records in both tables can be associated with
+multiple records in the other table.
+
+### Example
+
+- Students can enroll in multiple courses
+- Each course may have multiple students
+
+### Implementation
+
+👉 `sqlalchemy_examples/many_to_many.py`
+
+Let's examine how we've implemented the many-to-many relationship in SQLAlchemy 2.0
+
+#### 1. Association Class
+
+- Instead of using a plain association table, we've created a full `StudentCourseLink` class.
+- This approach **allows us to add additional attributes to the relationship, like
+  `enrollment_date`**
+
+#### 2. Relationship Definition
+
+- Each model has a relationship to the association class, not directly to the
+  other model
+- Both `Student` and `Course` have **properties** that provide convenient acces to the
+  related objects.
+
+#### 3. Primary Keys
+
+The association class uses a composite primary key made up of both foreign keys.
+
+#### 4. Cascading
+
+We use `cascade="all, delete-orphan"` to **ensure that related records are properly
+deleted when a parent record is deleted**.
+
+#### 5. Access Patterns
+
+- We can navaigate the relationship from either direction:
+  - `student.courses` gives us all courses from a student
+  - `course.students` gives us all students in a course
+- We can also access the full link object to get additional data (like enrollment date)
+
+▶️ You can run this script with:
+
+```bash
+python -m sqlalchemy_examples/many_to_many.py
+```
