@@ -517,3 +517,215 @@ Add these to your `pyproject.toml`:
 [project.optional-dependencies]
 mysql = ["pymysql>=1.0.2", "python-dotenv>=1.0.0"]
 ```
+
+# IV. ☁️ Cloud SQL
+
+## Setting Up Cloud SQL on GCP for Your ORM Project
+
+### 0. Table of Contents
+
+1. **GCP Project Setup**
+
+   - Creating/selecting a project
+   - Enabling Cloud SQL API
+   - Setting up billing
+
+2. **Configuring Cloud SQL Instance**
+
+   - Creating a MySQL instance
+   - Basic configuration
+   - Network setup
+
+3. **Database Setup**
+
+   - Creating database
+   - User management
+
+4. **Connecting to Cloud SQL**
+
+   - From local environment
+   - Cloud SQL Auth Proxy
+   - Connection strings
+
+5. **Security Configuration**
+
+   - Access control
+   - Private vs Public IP
+   - Using IAM
+
+6. **Application Integration**
+
+   - Updating SQLAlchemy connection
+   - Environment variables
+   - Testing connectivity
+
+7. **Monitoring and Maintenance**
+   - Monitoring setup
+   - Backups
+   - Cost management
+
+## 1. GCP Project Setup
+
+### 1.1 Creating/Selecting a Project
+
+- 🖥️ **Via GCP Console:**
+
+  1. Log in to [Google Cloud Console](https://console.cloud.google.com/).
+  2. Click the project dropdown at the top and select **"New Project"**.
+  3. Enter a project name that reflects your application (e.g., `cloud-mysql-orm`).
+  4. Click **"Create"** and wait for the project to initialize (~30 seconds).
+  5. Select your new project from the dropdown menu at the top.
+
+- ⌨️ **Via gcloud CLI:** (create, then set the current project)
+  ```bash
+  gcloud projects create your-project-id --name="cloud-mysql-orm"
+  gcloud config set project your-project-id
+  ```
+
+### 1.2 Enabling Cloud SQL API
+
+- 🖥️ **Via GCP Console:**
+
+  1. Navigate to **"APIs & Services" > "Library"** in the left menu.
+  2. Search for **"Cloud SQL Admin API"**.
+  3. Click on the result and then click **"Enable"**.
+
+- ⌨️ **Via gcloud CLI:**
+  ```bash
+  gcloud services enable sqladmin.googleapis.com
+  ```
+
+### 1.3 Setting Up Billing
+
+- 🖥️ **Via GCP Console:**
+
+  1. Navigate to **"Billing"** in the left menu..
+  2. Link an existing billing account or create a new one.
+  3. Note: Cloud SQL will incur charges (~$20-200/month depending on configuration).
+
+- ⌨️ **Verification via gcloud CLI:**
+  ```bash
+  gcloud beta billing projects describe your-project-id
+  ```
+
+### 1.4 ✅ Verifying the Setup
+
+- 1️⃣ **Project Verification:**
+
+  - Confirm that your new project appears in the [Google Cloud Console Projects list](https://console.cloud.google.com/projectselector2/home/dashboard).
+  - Alternatively, run:
+    ```bash
+    gcloud projects list
+    ```
+    to ensure your project is listed.
+
+- 2️⃣ **Cloud SQL API Verification:**
+
+  - In the Cloud Console, navigate to **"APIs & Services" > "Dashboard"** and check that the **Cloud SQL Admin API** is enabled.
+  - Alternatively, run:
+    ```bash
+    gcloud services list --enabled | grep sqladmin
+    ```
+    to confirm that the Cloud SQL API is active.
+
+- 3️⃣ **Billing Verification:**
+  - Open the **"Billing"** section in the Cloud Console and verify that your project is linked to an active billing account.
+  - You can also use the CLI:
+    ```bash
+    gcloud beta billing projects describe your-project-id
+    ```
+    to check that billing is properly configured.
+
+## 2. Configuring Cloud SQL Instance
+
+### 2.1 Network Configuration
+
+Cloud SQL instances can use Public IP, Private IP, or both:
+
+- **Public IP**: Accessible from anywhere with authorized networks
+- **Private IP**: Accessible only within your VPC network (more secure)
+
+For this tutorial, we'll set up Private IP using the default VPC:
+
+1. Navigate to "VPC Network" > "VPC Networks"
+2. Enable **Compute Engine API**
+3. Scroll down to see the **VPC networks** list to confirm the `default` network exists
+4. Click on it, and go, on the right, click on the **PRIVATE SERVICES ACCESS** tab
+5. Click on the blue button **ENABLE API** to enable Service Networking API
+6. Under **ALLOCATED IP RANGES FOR SERVICES** tab, click on the **ALLOCATED IP RANGE** button, and specify:
+
+- Name: `google-managed-services-range`
+- IP range (under _custom_): `10.0.0.0/24`
+- Click on **ALLOCATE**
+
+7. Under **PRIVATE CONNECTIONS TO SERVICES** tab, click on the **CREATE CONNECTION** button, and:
+
+- Keep "Google Cloud Platform" for Connected service producer
+- Check the box for "google-managed-services-range" and click on **OK**
+- Click on **CONNECT**
+
+### 2.2 Creating a MySQL Instance
+
+Once you've confirmed that the default VPC is available, the next step is to create
+a Cloud SQL instance running MySQL.
+
+#### 🖥️ Using the GCP Console:
+
+> **NOTE**: On the right panel, you will see an **updating estimated of the incurred costs**
+
+1. Navigate to **"SQL"** in the left menu.
+2. Click **"Create Instance" > "MySQL" > "Choose MySQL"**.
+3. Choose **"Enterprise"** for the Cloud SQL Edition and **"Sandbox"** as Edition preset.
+4. As **Instance info**, choose MySQL 8.0 (latest) as **Database version**
+5. Below **SHOW MINOR VERSIONS**:
+
+- choose `mysql-orm-1` (must be unique)
+- choose and store a strong secure password
+
+6. Below **Choose Region and Zonal Availability**:
+
+- choose `europe-west1 (Belgium)` as a **Region**
+- choose Single zone for **Zonal availibility** (useless to unroll **SPECIFY ZONES**, keep "Any")
+
+7. Under **Customize Your Instance**:
+
+- unroll **SHOW CONFIGURATION OPTIONS**
+- unroll **Machine Configuration** and choose the "smallest"
+- unroll **Storage** and choose HDD to spare some costs (keep the rest untouched)
+- unroll **Connections** and:
+  - check **Private IP** box
+  - that's all! Everything else is already done with the `default` network
+  - unckeck **Public IP** box (unless you want external access)
+- Finally, click on the blue button **CREATE INSTANCE** (it will take some time)
+
+#### ⌨️ Via GCP Console
+
+```bash
+gcloud sql instances create mysql-instance-1 \
+  --database-version=MYSQL_8_0 \
+  --cpu=1 \
+  --memory=3840MB \
+  --region=us-central1 \
+  --root-password=YOUR_PASSWORD \
+  --storage-type=SSD \
+  --storage-size=10GB \
+  --availability-type=zonal \
+  --backup-start-time=04:00 \
+  --enable-bin-log \
+  --network=default \
+  --no-assign-ip
+```
+
+#### ✅ Verifying the instance
+
+- **GCP Console**: Ensure the new instance appears in the Cloud SQL instances list
+  and its status is **"Runnable"** (on the round, green checkbox)
+- **gcloud CLI**: Run
+  ```bash
+  gcloud sql instances list
+  ```
+  or
+  ```bash
+  gcloud sql instances describe your-instance-id
+  ```
+  to confirm the instance is active and properly configured
