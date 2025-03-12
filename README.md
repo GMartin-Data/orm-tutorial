@@ -1,4 +1,4 @@
-# ORM Relationships Tutorial
+# I. ORM Relationships Tutorial
 
 ## Part 1: One-to-Many Relationship with SQLAlchemy 2.0
 
@@ -195,7 +195,7 @@ Let's examine how SQLModel handles many-to-many relationships:
 python -m sqlmodel_examples.many_to_many
 ```
 
-# Populating ORM Models with Pandas DataFrames
+# II. Populating ORM Models with Pandas DataFrames
 
 ## Part 5: Populating One-to-Many Relationships From DataFrames With SQLAlchemy 2.0
 
@@ -333,7 +333,7 @@ the database use numeric IDs. We manage this difference trhough:
 python -m sqlalchemy_examples.many_to_many_pandas
 ```
 
-## Populating Many-to-Many Relationships from DataFrames With SQLModel
+## Part 8: Populating Many-to-Many Relationships from DataFrames With SQLModel
 
 ### Key Techniques For Importing DataFrames Into ORMs
 
@@ -385,4 +385,135 @@ Before creating relationships, we validate that both entities exist:
 
 ```bash
 python -m sqlmodel_examples.many_to_many_pandas
+```
+
+# III. Migrating from SQLite to MySQL
+
+This guide covers the essential steps to migrate your ORM project from SQLite to MySQL/MariaDB.
+
+## 1. Database Connection Setup
+
+Replace the SQLite engine with a MySQL-compatible one:
+
+```python
+from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Create MySQL engine
+engine = create_engine(
+    f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}",
+    echo=True,                                    # Log all SQL
+    pool_size=5,                                  # Maintain 5 connections
+    max_overflow=10,                              # Allow 10 extra temp connections
+    pool_pre_ping=True,                           # Verify connections before use
+    pool_recycle=3600                             # Recycle connections after 1 hour
+)
+```
+
+Key connection parameters:
+
+- `pool_size`: Number of permanent connections to maintain
+- `max_overflow`: Additional temporary connections allowed during high load
+- `pool_pre_ping`: Tests if connections are alive before using them
+- `pool_recycle`: Maximum age of connections in seconds (prevents "stale connection" errors)
+
+## 2. Database Creation
+
+SQLite automatically creates databases as files, but MySQL requires explicit creation:
+
+```python
+from sqlalchemy import text
+
+def create_database_if_not_exists(engine):
+    """Create the database if it doesn't exist."""
+    db_name = engine.url.database
+
+    # Create a connection without specifying a database
+    base_engine = create_engine(
+        f"{engine.url.drivername}://{engine.url.username}:{engine.url.password}@{engine.url.host}",
+        echo=False
+    )
+
+    # Create database if it doesn't exist
+    with base_engine.connect() as conn:
+        conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {db_name}"))
+        print(f"Ensured database '{db_name}' exists")
+```
+
+Call this function before creating tables: `create_database_if_not_exists(engine)`
+
+## 3. User Authentication
+
+MariaDB/MySQL on Linux systems typically uses `unix_socket` authentication for root. Create a dedicated database user:
+
+```sql
+# Connect to MariaDB as root
+sudo mariadb
+
+# Create a dedicated user
+CREATE USER 'devuser'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON *.* TO 'devuser'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+Store these credentials in your `.env` file:
+
+```
+DB_USER=devuser
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_NAME=your_database
+```
+
+## 4. MySQL Dialect Requirements
+
+MySQL has stricter type requirements than SQLite:
+
+1. **String lengths**: MySQL requires explicit VARCHAR lengths
+
+   ```python
+   from sqlalchemy import String
+
+   # SQLite (works but not in MySQL)
+   name: Mapped[str] = mapped_column()
+
+   # MySQL compatible
+   name: Mapped[str] = mapped_column(String(100))
+   ```
+
+2. **Text columns**: For longer text, use Text type
+
+   ```python
+   from sqlalchemy import Text
+
+   description: Mapped[str] = mapped_column(Text)
+   ```
+
+3. **Default values**: More restrictive in MySQL, especially with dates
+
+   ```python
+   # Use default_factory for dates rather than default
+   from datetime import datetime
+
+   created_at: Mapped[datetime] = mapped_column(default_factory=datetime.now)
+   ```
+
+## 5. Dependencies
+
+Install required packages:
+
+```bash
+uv pip install pymysql python-dotenv
+```
+
+Add these to your `pyproject.toml`:
+
+```toml
+[project.optional-dependencies]
+mysql = ["pymysql>=1.0.2", "python-dotenv>=1.0.0"]
 ```
