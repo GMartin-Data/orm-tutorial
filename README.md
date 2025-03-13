@@ -758,3 +758,68 @@ gcloud sql instances create mysql-instance-1 \
   > ```
   >
   > You'll be then prompted for the root password you earlier set
+
+## 3. Database Setup
+
+### 3.1. Creating a Database
+
+Now that your Cloud SQL MySQL instance is running, let's create a database:
+
+⌨️ **Using Cloud Shell:**
+
+Assuming you're already connected, create a database, check creation, then use it.
+
+```bash
+CREATE DATABASE university_db;
+SHOW DATABASES;
+USE university_db;
+```
+
+### 3.2. User Management
+
+It's best practise not to use the root user for application connections. Let's
+create a dedicated user.
+
+⌨️ **Using Cloud Shell:**
+
+Assuming you're already connected...
+
+1. Create a new user
+
+```bash
+CREATE USER 'app_user'@'%' IDENTIFIED BY 'strong-password-here';
+```
+
+2. Grant privileges to the user
+
+```bash
+GRANT ALL PRIVILEGES ON university_db.* TO 'app_user'@'%';
+FLUSH PRIVILEGES;
+```
+
+3. Verify the user was created
+
+```bash
+SELECT User, Host
+  FROM mysql.user
+ WHERE User='app_user';
+```
+
+4. Exit and test the user can connect
+
+```bash
+EXIT;
+gcloud sql connect mysql-instance-1 --user=app_user
+```
+
+5. Check if the user can access the database
+
+```bash
+USE university_db;
+```
+
+### 3.3 ✅ Verification Checklist
+
+- Database exists and is accessible
+- App user created with proper permissions
+- Both `root` and `app_user` can connect to the instance
