@@ -823,3 +823,134 @@ USE university_db;
 - Database exists and is accessible
 - App user created with proper permissions
 - Both `root` and `app_user` can connect to the instance
+
+## 4. Connecting to Cloud SQL
+
+### 4.1. Connection Options Overview
+
+There are three main ways to connect to your Cloud SQL Instance:
+
+1. **Direct connection** (using Public IP - excluded here)
+2. **Cloud SQL Auth Proxy** (most secure option)
+3. **Private IP** (within VPC)
+
+For your SQLAlchemy/SQLModel application, we'll focus on the **Auth Proxy** method
+
+### 4.2. Setting Up Cloud SQL Auth Proxy
+
+The Auth Proxy provides secure access to your Cloud SQL instance without requiring
+a public IP.
+
+#### Local Development environment
+
+1. Download the Cloud SQL Auth Proxy
+
+```bash
+wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.1/cloud-sql-proxy.linux.amd64 -O cloud_sql_proxy
+chmod +x cloud_sql_proxy
+```
+
+2. Create a service account for the proxy:
+
+```bash
+# Switch to your project if needed
+gcloud config set project your-project-id
+
+# Create service account
+gcloud iam service-accounts create cloud-sql-proxy \
+  --description="Cloud SQL Auth Proxy service account" \
+  --display-name="Cloud SQL Auth Proxy"
+
+# Grant necessary permissions
+gcloud projects add-iam-policy-binding your-project-id \
+  --member="serviceAccount:cloud-sql-proxy@your-project-id.iam.gserviceaccount.com" \
+  --role="roles/cloudsql.client"
+
+# Create and download key file
+gcloud iam service-accounts keys create cloud-sql-proxy-key.json \
+  --iam-account=cloud-sql-proxy@your-project-id.iam.gserviceaccount.com
+```
+
+These commands create and configure a service account specifically for Cloud SQL Auth Proxy:
+
+a. **Set project context**:
+
+    - Ensures all commands target your specific project
+
+b. **Create service account**:
+
+    - Creates a dedicated technical identity for the proxy
+    - Better security than using your personal account
+    - Names and describes it for easy identification
+
+c. **Grant permissions**:
+
+    - Gives the service account "Cloud SQL Client" role
+    - Allows connecting to Cloud SQL instances but nothing else
+    - Applies least-privilege security principle
+
+d. **Create key file**:
+
+    - Generates credentials (JSON key file) for the proxy to authenticate
+    - Acts like a password for the service account
+    - ☝️ **IMPORTANT**:
+      - The service account key (`cloud-sql-proxy-key.json`) is downloaded to your current directory when you run the `gcloud iam service-accounts keys create` command.
+      - It doesn't get stored in the console.
+      - Keep this file secure; anyone with it can access your databases
+
+These steps establish a secure, isolated identity specifically for database connectivity.
+
+> You can manage existing keys in the GCP Console:
+>
+> 1. Navigate to "IAM & Admin" > "Service Accounts"
+> 2. Find your service account (`cloud-sql-proxy`)
+> 3. Click on it > "Keys" tab
+> 4. Here you can view, disable, or delete existing keys
+>
+> **Best practices:**
+>
+> - Store keys securely (e.g., in secret management systems)
+> - Rotate keys periodically
+> - Delete keys when no longer needed
+> - Never commit keys to version control
+>
+> If you lose the key file, you'll need to create a new one and delete the old one.
+
+3. Get your instance connection name
+
+```bash
+gcloud sql instances describe mysql-instance-1 --format="value(connectionName)"
+```
+
+This will output something like: `your-project-id:your-region:mysql-instance-1`
+
+4. Start the proxy:
+
+```bash
+# Linux/macOS
+export GOOGLE_APPLICATION_CREDENTIALS=./cloud-sql-proxy-key.json
+./cloud_sql_proxy YOUR_CONNECTION_NAME --port 13306
+```
+
+(13306 was tested as an alternative port, though 3306 is the standard port for MariaDB)
+
+Keep this terminal open while you need the connection
+
+### 4.3. Testing the Connection
+
+1. Open a new terminal window (keep the proxy running)
+2. Connect to the database using a standard MySQL client
+
+```bash
+mysql -u app_user -p -h 127.0.0.1 -P 13306
+```
+
+(You don't have to specify the port if this is the standard one for MariaDB.
+As we had to change it previously, it's then necessary to specify it.)
+
+3. Verify you can access the database
+
+```sql
+USE university_db;
+SHOW TABLES;
+```
