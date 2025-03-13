@@ -722,10 +722,10 @@ gcloud sql instances create mysql-instance-1 \
   and its status is **"Runnable"** (on the round, green checkbox)
 - **gcloud CLI**: Run
   ```bash
-  gcloud sql instances list
-  ```
-  or
-  ```bash
-  gcloud sql instances describe your-instance-id
+  gcloud sql instances describe mysql-instance-1
   ```
   to confirm the instance is active and properly configured
+- **Connection Test**: Once running, test connectivity with:
+  ```bash
+  gcloud sql connect mysql-instance-1 --user=root
+  ```
