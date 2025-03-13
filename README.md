@@ -546,6 +546,7 @@ mysql = ["pymysql>=1.0.2", "python-dotenv>=1.0.0"]
    - From local environment
    - Cloud SQL Auth Proxy
    - Connection strings
+   - ☝️ Changes if developing on the Cloud
 
 5. **Security Configuration**
 
@@ -954,3 +955,255 @@ As we had to change it previously, it's then necessary to specify it.)
 USE university_db;
 SHOW TABLES;
 ```
+
+### 4.4. SQLAlchemy Connection String
+
+Update your SQLAlchemy engine configuration to connect through the proxy
+
+```python
+from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Cloud SQL via proxy connection
+engine = create_engine(
+    f"mysql+pymysql://{os.getenv('DB_USER')}:"
+    f"{os.getenv('DB_PASSWORD')}@127.0.0.1:13306/{os.getenv('DB_NAME')}",
+    echo=True,
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+    pool_recycle=3_600
+)
+```
+
+Update your `.env` file:
+
+```
+DB_USER=app_user
+DB_PASSWORD=strong-password-here
+DB_HOST=127.0.0.1
+DB_NAME=university_db
+```
+
+### 4.5. ✅ Verification Checklist
+
+- Auth Proxy is running without errors
+- MySQL client can connect through the proxy
+- Service account has proper permissions
+- SQLAlchemy engine connects succesfully
+
+With these steps completed, your application can now connect securely to your Cloud SQL MySQL instance!
+
+### 4.6. Changes if Developing on the Cloud
+
+If developing entirely within GCP rather than on a local machine, these key
+differences would apply:
+
+1. **Development Environment**
+
+- Use **Cloud Shell** or **Cloud Workstations** instead of local WSL
+- Cloud Code extensions for VSCode/IntelliJ in Cloud Shell Editor
+
+2. **Authentication**
+
+- No need for service account keys - Cloud Shell has built-in authentication
+- Simplified permissions using default compute service account
+
+3. **Database Connectivity**
+
+- No Auth Proxy needed for Cloud Shell - direct connection using private IP
+- Connection string would use internal IP or instance name:
+
+```python
+# Direct connection from Cloud Shell/Compute resources
+engine = create_engine(
+    f"mysql+pymysql://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@"
+    f"{PRIVATE_IP}/{os.getenv('DB_NAME')}"
+)
+```
+
+☝️ The `.env` file would also, obviously, be slightly different:
+
+```
+# Cloud SQL connection for GCP internal development
+DB_USER=app_user
+DB_PASSWORD=your-secure-password
+DB_HOST=10.x.x.x  # Private IP of your Cloud SQL instance
+DB_NAME=university_db
+
+# Optional: Connection pool configuration
+DB_POOL_SIZE=5
+DB_MAX_OVERFLOW=10
+DB_POOL_RECYCLE=3600
+
+# Optional: Alternative to private IP - use instance connection name
+# INSTANCE_CONNECTION_NAME=project-id:region:instance-name
+```
+
+👉 To get your instance's private IP:
+
+```bash
+gcloud sql instances describe mysql-instance-1 --format="value(ipAddresses[0].ipAddress)"
+```
+
+4. **Network Configuration:**
+
+- Same VPC networking - automatically handled
+- No need to authorize external APIs
+
+5. **Deployment**
+
+- Simplified CI/CD using **Cloud Build**
+- Direct deployment to **App Engine/Cloud Run/GKE**
+
+This approach:
+
+- eliminates most local setup complexity and security concerns
+- but reduces offline development capabilities.
+
+## 5. Security Configuration
+
+### 5.1. Access Control Best Practises
+
+Let's implement security best practises for your Private IP Cloud SQL Instance
+
+1. **Enable SSL for Secure Connections**
+
+   ```bash
+   # Enable SSL for the instance
+   gcloud sql instances patch mysql-instance-1 --require-ssl
+
+   # Create client certificates if needed
+   gcloud sql ssl client-certs create client-cert client-key.pem --instance=mysql-instance-1
+
+   # Download server certificate
+   gcloud sql instances describe mysql-instance-1 --format="value(serverCaCert.cert)" > server-ca.pem
+   ```
+
+   > **NOTE**: About Client Certificates
+   >
+   > Client certificates provide mutual authentication in SSL/TLS connections
+   >
+   > 1. **Basic SSL** only verifies the server's identity to you
+   > 2. **Client certificates** verify your identity to the server
+   >
+   > In a Cloud SQL context:
+   >
+   > - Your database has a Certificate Authority (CA)
+   > - When you create client certificates, they're signed by this CA
+   > - During connection, you present your certificate and private key
+   > - The server validates these against its trusted CA
+   > - Connection proceeds only if this validation succeeds
+   >
+   > This provides stronger security through:
+   >
+   > - Authentication without passwords
+   > - Resistance to credentials theft (certificates are harder to steal)
+   > - Protection against man-in-the-middle attacks
+   > - Granular access control (different certificates for different applications)
+   >
+   > Client certificates are optional but recommended for high-security environments
+   > or when compliance requires strong authentication methods.
+
+2. **Verify SSL is required**
+   ```bash
+   gcloud sql instances describe mysql-instance-1 \
+   --format="value(settings.ipConfiguration.requireSsl)"
+   ```
+   You should see `True` as the output.
+
+### 5.2. Private IP Security Benefits
+
+Your instance si configured with Private IP only, which provides security advantages:
+
+1. **Enhanced Security**:
+
+- Network traffic never traverses the public internet
+- Inherently protected from external network attacks
+- Not visible to potential attackers scanning the internet
+
+2. **Verification**: Confirm your instance has only Private IP:
+
+```bash
+gcloud sql instances describe mysql-instance-1 \
+--format="value(ipAddresses[].type, ipAddresses[].ipAddress)"
+```
+
+You should see only `PRIVATE` type listed
+
+3. **Connection Methods:**
+
+With Private IP only, your instance is accessible through:
+
+- Cloud SQL Auth Proxy (what we've configured)
+- Direct connection from resources in the same VPC network
+- VPC peering or VPN for external networks
+
+### 5.3. IAM and Service Account Security
+
+When using service accounts with Cloud SQL, follow these security principles:
+
+1. **Apply Least Privilege to the Service Account**
+
+   ```bash
+   # List current roles
+   gcloud projects get-iam-policy your-project-id --format=json | grep cloud-sql-proxy
+
+   # Remove overly permissive roles if present
+   gcloud projects remove-iam-policy-binding your-project-id \
+     --member="serviceAccount:cloud-sql-proxy@your-project-id.iam.gserviceaccount.com" \
+     --role="roles/editor"
+
+   # Ensure only necessary role is present
+   gcloud projects add-iam-policy-binding your-project-id \
+     --member="serviceAccount:cloud-sql-proxy@your-project-id.iam.gserviceaccount.com" \
+     --role="roles/cloudsql.client"
+   ```
+
+2. **Audit Service Account Key**
+
+   ```bash
+   # List keys for the service account
+   gcloud iam service-accounts keys list \
+     --iam-account=cloud-sql-proxy@your-project-id.iam.gserviceaccount.com
+   ```
+
+   > ☝️ **NOTE**: Consider implementing key rotation policies for production environments.
+
+3. **Protect Your Key File**
+
+   ```bash
+   # Set restrictive permissions on the key file
+   chmod 600 cloud-sql-proxy-key.json
+
+   # Consider encrypting the key when not in use
+   gpg -c cloud-sql-proxy-key.json
+   ``
+   ```
+
+### 5.4 ✅ Security Verification Checklist
+
+1. **Access Control**
+
+   - Private IP configured correctly
+   - SSL/TLS is properly configured
+   - Database users have limited permissions
+
+2. **IAM Security**
+
+   - Service account has only required permissions
+   - Key file is properly secured
+   - No unnecessary keys exist
+
+3. **Connection Test With SSL**
+
+   ```bash
+   # Connecting with SSL via Auth Proxy
+   mysql -u app_user -p -h 127.0.0.1 -P 13306 --ssl-ca=server-ca.pem
+   ```
+
+By following these security practices, your Private IP Cloud SQL MySQL instance is now
+configured with defense-in-depth principles and aligned with cloud security best practices.
