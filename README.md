@@ -1207,3 +1207,86 @@ When using service accounts with Cloud SQL, follow these security principles:
 
 By following these security practices, your Private IP Cloud SQL MySQL instance is now
 configured with defense-in-depth principles and aligned with cloud security best practices.
+
+## 6. Application Integration
+
+### 6.1. Updating SQLAlchemy Connection
+
+Update your SQLAlchemy code to connect to Cloud SQL
+
+#### 🐍 Local Development With Auth Proxy
+
+▶️ Run the script this way
+
+```bash
+python -m sqlalchemy_examples.gcp.cloud_sql_connection
+```
+
+#### 🐍 For GCP-Hosted Applications
+
+See inside the file for the dedicated version of the `get_engine` function.
+
+### 6.2. Environment Variables
+
+Create a `.env` file with these settings:
+
+```
+# For Auth Proxy connection
+DB_USER=app_user
+DB_PASSWORD=your-secure-password
+DB_NAME=university_db
+DB_PORT=13306
+
+# For direct GCP connection
+# DB_HOST=10.x.x.x  # Private IP address
+# SSL_CA_PATH=/path/to/server-ca.pem
+
+# Connection pool configuration
+DB_POOL_SIZE=5
+DB_MAX_OVERFLOW=10
+DB_POOL_RECYCLE=3600
+DB_ECHO=true
+```
+
+### 6.3. Testing the Integration
+
+From your lcoal environment:
+
+```bash
+# Get your instance connection name
+gcloud sql instances describe mysql-instance-1 \
+--format="value(connectionName)"
+
+# Ensure Auth Proxy is running
+./cloud-sql-proxy your-connection-name --port 13306
+
+# Run your application
+python -m sqlalchemy_examples.mysql.cloud_sql_connection
+
+# Verify tables in database
+mysql -u app_user -p -h 127.0.0.1 -P 13306 university_db -e "SHOW TABLES;"
+```
+
+### 6.4. Common Issues and Solutions 🪛
+
+- **Connection Refused** - Check if:
+  - Auth Proxy is running
+  - port is correct
+  - firewall allows connection
+- **Access Denied** - Verify:
+  - credentials
+  - permissions
+- **SSL Issues** - Check:
+  - certificates
+  - paths
+- **Timeouts** - Settings to adjust:
+  - `pool_recycle`
+  - `connect_timeout`
+
+### 6.5. ✅ Verification Checklist
+
+- Connection works with Auth Proxy
+- Tables create successfully
+- Environment variables are properly configured
+- Database Operations work correctly
+- Connection pool functions properly
