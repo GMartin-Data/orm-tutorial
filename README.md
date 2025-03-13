@@ -726,6 +726,35 @@ gcloud sql instances create mysql-instance-1 \
   ```
   to confirm the instance is active and properly configured
 - **Connection Test**: Once running, test connectivity with:
+
   ```bash
   gcloud sql connect mysql-instance-1 --user=root
   ```
+
+  > ☝️ **NOTE**
+  >
+  > You may experience issues with connecting, which can be solved the following way:
+  > (Within Cloud Shell launched on the Web)
+  >
+  > 1. Add a public IP to your instance
+  >
+  > ```bash
+  > gcloud sql instances patch mysql-instance-1 --assign-ip
+  > ```
+  >
+  > 2. Authorise Cloud Shell IP
+  >
+  > ```bash
+  > # Get your Cloud Shell IP
+  > export CLOUD_SHELL_IP=$(curl -s ifconfig.me)
+  > # Add it to authorized networks
+  > gcloud sql instances patch mysql-instance-1 --authorized-networks=$CLOUD_SHELL_IP/32
+  > ```
+  >
+  > 3. Try connecting again:
+  >
+  > ```bash
+  > gcloud sql connect mysql-instance-1 --user=root
+  > ```
+  >
+  > You'll be then prompted for the root password you earlier set
